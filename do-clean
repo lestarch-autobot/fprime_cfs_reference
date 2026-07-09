@@ -19,6 +19,6 @@ then
     cp cfe/cmake/Makefile.sample Makefile
 fi
 
-rm -r build
+rm -rf build build-artifacts
 make SIMULATION=native prep
 ./do
