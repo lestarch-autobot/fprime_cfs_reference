@@ -116,6 +116,9 @@ jobs:
             "fprime-cosmos @ git+https://github.com/lestarch-autobot/fprime-cosmos.git@devin/1794290000-cosmos-events" pytest
           set -a; . cosmos-project/.env; set +a
           export OPENC3_API_PASSWORD="$OPENC3_SERVICE_PASSWORD"
+          # the gem was loaded with the CLI, so no user password exists yet; the transport (unlike the service
+          # Authorization header the rpc() helper uses) needs one. Set it to the service password once.
+          curl -sf -X POST http://localhost:2900/openc3-api/auth/set --data-urlencode "password=$OPENC3_API_PASSWORD" > /dev/null
           (cd build-artifacts/exe/cpu1 && ./core-cpu1 > core-cpu1.log 2>&1 &) ; sleep 10
           rpc() { curl -sf -X POST http://localhost:2900/openc3-api/api -H "Authorization: $OPENC3_API_PASSWORD" \
                    -H 'Content-Type: application/json-rpc' -d "$1"; }
