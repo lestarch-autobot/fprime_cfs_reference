@@ -109,6 +109,9 @@ jobs:
         # (fprime-community/fprime-cosmos#3 + #4) until both are released; then plain `pip install fprime-cosmos`.
         run: |
           python3 -m venv cosmos-venv
+          # the fork clone carries no tags, so setuptools-scm would version fprime-gds 0.1.devN and fail
+          # fprime-cosmos's fprime-gds>=4.4.0a4 pin; pretend the version the branch is based on
+          SETUPTOOLS_SCM_PRETEND_VERSION_FOR_FPRIME_GDS=4.4.2.dev17 \
           cosmos-venv/bin/pip install -q "fprime-gds @ git+https://github.com/lestarch-autobot/fprime-gds.git@devin/1794262255-data-transport-plugin" \
             "fprime-cosmos @ git+https://github.com/lestarch-autobot/fprime-cosmos.git@devin/1794290000-cosmos-events" pytest
           set -a; . cosmos-project/.env; set +a
