@@ -85,6 +85,10 @@ jobs:
           cp cosmos/compose.override.yaml cosmos-project/
           cd cosmos-project
           ./openc3.sh run
+          # ready = the init container (buckets, default plugins) has exited 0 and the API answers; loading a
+          # plugin earlier fails with "Bucket 'config' does not exist"
+          init=$(docker compose -f compose.yaml -f compose.override.yaml ps -a -q openc3-cosmos-init)
+          test "$(timeout 600 docker wait "$init")" = "0" || { docker logs "$init" | tail -50; exit 1; }
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:2900/openc3-api/api || true)
             [ "$code" = "404" ] || [ "$code" = "405" ] && break
