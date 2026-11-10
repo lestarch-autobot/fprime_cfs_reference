@@ -77,6 +77,52 @@ jobs:
           cosmos/check-plugin.sh build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin \
             build-artifacts/native/default_cpu1/cosmos/docker-builder/openc3-cosmos-cfs-0.0.0.pre.docker.gem 1 \
             build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP
+      - name: "Start COSMOS 7.5.1 (cosmos-project) with the cFS reference plugin"
+        # Deployment -> COSMOS -> Integration Test API: COSMOS owns the cFS link (to_lab UDP 2234 into the plugin's
+        # CFS-1 interface), the test API talks only to COSMOS through the fprime-cosmos `cosmos` data transport.
+        run: |
+          git clone --depth 1 --branch v7.5.1 https://github.com/OpenC3/cosmos-project.git cosmos-project
+          cp cosmos/compose.override.yaml cosmos-project/
+          cd cosmos-project
+          ./openc3.sh run
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:2900/openc3-api/api || true)
+            [ "$code" = "404" ] || [ "$code" = "405" ] && break
+            sleep 5
+          done
+          mkdir -p cfs-plugin
+          cp ../build-artifacts/native/default_cpu1/cosmos/openc3-cosmos-cfs-*.gem cfs-plugin/
+          # vars.json's cfs_1_intf_ip is the compose network gateway (COSMOS -> ci_lab on the runner host)
+          gateway=$(docker network inspect cosmos-project_default -f '{{(index .IPAM.Config 0).Gateway}}')
+          python3 -c "import json,sys; v=json.load(open('../cosmos/vars.json')); v['cfs_1_intf_ip']='$gateway'; json.dump(v, open('cfs-plugin/vars.json','w'))"
+          set -a; . ./.env; set +a
+          # openc3.sh cli needs a TTY; this is its command without -t (service password = API password here)
+          docker compose -f compose.yaml -f compose.override.yaml run --rm -T -v "$PWD:/openc3/local:z" -w /openc3/local \
+            -e OPENC3_API_PASSWORD="$OPENC3_SERVICE_PASSWORD" --no-deps openc3-cosmos-cmd-tlm-api \
+            ruby /openc3/bin/openc3cli load cfs-plugin/openc3-cosmos-cfs-*.gem --variables cfs-plugin/vars.json
+      - name: "Integration tests through COSMOS (fprime-gds data-transport plugin `cosmos`, cfs layout)"
+        # fprime-gds with the data-transport plugin category (nasa/fprime-gds#386) and the fprime-cosmos transport
+        # (fprime-community/fprime-cosmos#3 + #4) until both are released; then plain `pip install fprime-cosmos`.
+        run: |
+          python3 -m venv cosmos-venv
+          cosmos-venv/bin/pip install -q "fprime-gds @ git+https://github.com/lestarch-autobot/fprime-gds.git@devin/1794262255-data-transport-plugin" \
+            "fprime-cosmos @ git+https://github.com/lestarch-autobot/fprime-cosmos.git@devin/1794290000-cosmos-events" pytest
+          set -a; . cosmos-project/.env; set +a
+          export OPENC3_API_PASSWORD="$OPENC3_SERVICE_PASSWORD"
+          (cd build-artifacts/exe/cpu1 && ./core-cpu1 > core-cpu1.log 2>&1 &) ; sleep 10
+          rpc() { curl -sf -X POST http://localhost:2900/openc3-api/api -H "Authorization: $OPENC3_API_PASSWORD" \
+                   -H 'Content-Type: application/json-rpc' -d "$1"; }
+          rpc '{"jsonrpc":"2.0","id":1,"method":"cmd_no_hazardous_check","params":["CFS-1","TO_LAB_CMD_ENABLE_OUTPUT",{"DEST_IP":"127.0.0.1"}],"keyword_params":{"scope":"DEFAULT"}}'
+          sleep 5
+          cosmos-venv/bin/python -m pytest -v test/int \
+            --dictionary "${{ github.workspace }}/build-artifacts/exe/Linux/fprime_app/dict/FPrimeDeploymentTopologyDictionary.json" \
+            --deployment-config "${{ github.workspace }}/test/int/int_config.json" \
+            --data-transport-selection cosmos --cosmos-url http://localhost:2900 --cosmos-target FPRIME_APP --cosmos-layout cfs
+      - name: "Stop COSMOS"
+        if: always()
+        run: |
+          pkill -f core-cpu1 || true
+          (cd cosmos-project && ./openc3.sh stop) || true
       - name: "Collect COSMOS plugin artifact"
         run: cp cosmos/vars.json cosmos/compose.override.yaml build-artifacts/native/default_cpu1/cosmos/
       - name: "Archive COSMOS plugin"
