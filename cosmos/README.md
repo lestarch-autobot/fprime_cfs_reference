@@ -82,8 +82,10 @@ Then `FPRIME_APP` carries the F Prime commands (`CfsCore.cmdDisp.CMD_NO_OP`, ...
 
 ## Known limitations
 
-- F Prime event packets (stream id 0x0802) have no `FPRIME_APP` definition yet and are swallowed by the nasa catch-all
-  file packets; use `fprime-gds` for events until the generator emits an EVENTS packet.
+- F Prime events arrive as the `FPRIME_APP FPRIME_EVENTS` packet (stream id 0x0802): one opaque `RECORD` block that
+  COSMOS shows as raw bytes. Readable events come from the fprime-gds event decoder through the
+  [fprime-cosmos](https://github.com/fprime-community/fprime-cosmos) `cosmos` data transport
+  (`pytest --data-transport-selection cosmos --cosmos-target FPRIME_APP --cosmos-layout cfs`, as CI runs `test/int`).
 - CI renders the generated target in the real openc3 gem but not the merged `plugin.txt` (the generator's load test has
   no merged-plugin mode yet); an unbalanced ERB edit there would surface at `openc3.sh cli load`.
 - The nasa plugin has no VARIABLE for the number of cFS instances (`$cfs_fleet_globals_num_cfs_targets`), hence the
