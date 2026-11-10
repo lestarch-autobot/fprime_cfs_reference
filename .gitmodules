@@ -45,7 +45,7 @@
 [submodule "libs/fprime_cfs_cosmos"]
 	path = libs/fprime_cfs_cosmos
 	url = https://github.com/lestarch-autobot/fprime-cfs-cosmos-one-app-one-target-generator.git
-	branch = nasa-plugin-compat
+	branch = devin/1794300000-cfs-events-packet
 [submodule "cosmos/cfs-cosmos-plugin"]
 	path = cosmos/cfs-cosmos-plugin
 	url = https://github.com/nasa/cfs-cosmos-plugin.git
